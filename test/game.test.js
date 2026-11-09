@@ -1,0 +1,56 @@
+'use strict';
+var assert = require('node:assert/strict');
+var api = require('../game.js');
+var now = 0;
+var game = new api.Game(180000, function () { return now; });
+assert.equal(api.dice.length, 25);
+api.dice.forEach(function (die) { assert.equal(die.length, 6); });
+assert.equal(game.state, 'STOPPED');
+game.toggle();
+assert.equal(game.state, 'STOPPED');
+game.start();
+assert.equal(game.state, 'STARTED');
+assert.equal(game.board.length, 25);
+assert.equal(new Set(game.board.map(function (cell) { return cell.die; })).size, 25);
+game.board.forEach(function (cell) {
+    assert.equal(cell.letter, api.dice[cell.die][cell.face]);
+});
+var board = JSON.stringify(game.board);
+game.start();
+assert.equal(JSON.stringify(game.board), board, 'Non si rimescola durante una partita');
+now = 10000;
+assert.equal(game.tick(), 170000);
+game.toggle();
+assert.equal(game.state, 'PAUSED');
+now = 70000;
+assert.equal(game.tick(), 170000);
+assert.equal(JSON.stringify(game.board), board);
+game.toggle();
+assert.equal(game.state, 'STARTED');
+now = 239999;
+assert.equal(game.tick(), 1);
+now = 300000; // Anche dopo una sospensione del browser la scadenza è rispettata.
+assert.equal(game.tick(), 0);
+assert.equal(game.state, 'ENDED');
+game.start();
+assert.equal(game.state, 'ENDED', 'Prima di rimescolare occorre mostrare la griglia');
+game.toggle();
+assert.equal(game.state, 'STOPPED');
+assert.equal(JSON.stringify(game.board), board);
+game.start();
+assert.equal(game.state, 'STARTED');
+assert.equal(game.remaining, 180000);
+for (var i = 0; i < 100; i++) {
+    var round = new api.Game();
+    round.start();
+    assert.equal(new Set(round.board.map(function (cell) { return cell.die; })).size, 25);
+    round.board.forEach(function (cell) { assert.ok(cell.face >= 0 && cell.face < 6); });
+}
+var lateClick = new api.Game(1000, function () { return now; });
+lateClick.start();
+now += 2000;
+lateClick.toggle();
+assert.equal(lateClick.state, 'ENDED', 'Un click su Pausa in ritardo non rivela il tabellone');
+lateClick.toggle();
+assert.equal(lateClick.state, 'STOPPED');
+console.log('OK: dadi, mescolamento, stati, pausa, scadenza e nuova partita.');
